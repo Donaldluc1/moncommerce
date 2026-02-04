@@ -1,0 +1,105 @@
+// Schéma de base de données pour l'application de gestion
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"  // Changer en "sqlite" pour dev local
+  url      = env("DATABASE_URL")
+}
+
+// Table des utilisateurs (commerçants)
+model User {
+  id            String   @id @default(uuid())
+  telephone     String   @unique
+  email         String?  @unique
+  password      String
+  nomCommerce   String   // Nom du commerce
+  typeActivite  String?  // Type d'activité (boutique, coiffure, etc.)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  // Relations
+  ventes        Vente[]
+  depenses      Depense[]
+  clients       Client[]
+  
+  @@map("users")
+}
+
+// Table des ventes
+model Vente {
+  id              String   @id @default(uuid())
+  montant         Float
+  modePaiement    String   // "cash" ou "credit"
+  nomClient       String?  // Optionnel
+  date            DateTime @default(now())
+  notes           String?
+  
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  clientId        String?
+  client          Client?  @relation(fields: [clientId], references: [id])
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@map("ventes")
+  @@index([userId, date])
+}
+
+// Table des dépenses
+model Depense {
+  id              String   @id @default(uuid())
+  montant         Float
+  motif           String   // Description de la dépense
+  date            DateTime @default(now())
+  categorie       String?  // Ex: "Stock", "Transport", "Salaire"
+  
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@map("depenses")
+  @@index([userId, date])
+}
+
+// Table des clients (surtout pour crédits)
+model Client {
+  id              String   @id @default(uuid())
+  nom             String
+  telephone       String?
+  adresse         String?
+  totalCredit     Float    @default(0)  // Total dû
+  
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  ventes          Vente[]
+  paiements       Paiement[]
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@map("clients")
+  @@index([userId])
+}
+
+// Table des paiements de crédit
+model Paiement {
+  id              String   @id @default(uuid())
+  montant         Float
+  date            DateTime @default(now())
+  notes           String?
+  
+  clientId        String
+  client          Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  
+  createdAt       DateTime @default(now())
+  
+  @@map("paiements")
+  @@index([clientId, date])
+}
