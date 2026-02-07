@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "API Backend pour application de gestion de commerce",
   "main": "src/server.js",
+  "prisma": {
+    "seed": "node prisma/seed.js"
+  },
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
