@@ -3,15 +3,18 @@
   "version": "1.0.0",
   "description": "API Backend pour application de gestion de commerce",
   "main": "src/server.js",
-  "prisma": {
-    "seed": "node prisma/seed.js"
-  },
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
+    "test:db": "node test-prisma.js",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
-    "prisma:studio": "prisma studio"
+    "prisma:deploy": "prisma migrate deploy",
+    "prisma:studio": "prisma studio",
+    "prisma:reset": "prisma migrate reset",
+    "prisma:status": "prisma migrate status",
+    "db:seed": "node prisma/seed.js",
+    "setup": "npm install && npx prisma generate && npx prisma migrate dev --name init && node test-prisma.js"
   },
   "keywords": ["gestion", "commerce", "api"],
   "author": "",
@@ -23,7 +26,9 @@
     "@prisma/client": "^5.7.0",
     "bcryptjs": "^2.4.3",
     "jsonwebtoken": "^9.0.2",
-    "express-validator": "^7.0.1"
+    "express-validator": "^7.0.1",
+    "@anthropic-ai/sdk": "^0.20.0",
+    "openai": "^4.28.0"
   },
   "devDependencies": {
     "nodemon": "^3.0.2",
