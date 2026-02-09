@@ -8,6 +8,7 @@ const depenseRoutes = require('./routes/depense.routes');
 const clientRoutes = require('./routes/client.routes');
 const statsRoutes = require('./routes/stats.routes');
 const aiRoutes = require('./routes/ai.routes');
+const subscriptionRoutes = require('./routes/subscription.routes');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -44,6 +45,7 @@ app.use('/api/depenses', depenseRoutes);
 app.use('/api/clients', clientRoutes);
 app.use('/api/stats', statsRoutes);
 app.use('/api/ai', aiRoutes);
+app.use('/api/subscription', subscriptionRoutes);
 
 // Gestion des erreurs 404
 app.use((req, res) => {
