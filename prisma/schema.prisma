@@ -23,6 +23,7 @@ model User {
   ventes        Vente[]
   depenses      Depense[]
   clients       Client[]
+  subscription  Subscription?
   
   @@map("users")
 }
@@ -102,4 +103,38 @@ model Paiement {
   
   @@map("paiements")
   @@index([clientId, date])
+}
+
+// Table des abonnements
+model Subscription {
+  id              String   @id @default(uuid())
+  userId          String   @unique
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Période d'essai (72h gratuit)
+  trialStartDate  DateTime @default(now())
+  trialEndDate    DateTime // Calculé : now() + 72h
+  
+  // Abonnement payant
+  plan            String?  // "monthly", "quarterly", "semesterly", "yearly"
+  amount          Float?   // Montant payé (2000, 5000, 10000, 20000)
+  
+  currentPeriodStart DateTime?
+  currentPeriodEnd   DateTime?
+  
+  // Statut global
+  status          String   @default("trial") // "trial", "active", "expired", "cancelled"
+  
+  // Informations de paiement
+  paymentMethod     String?  // "orange_money", "mtn_money", "moov_money", "wave"
+  transactionId     String?  // ID de la transaction
+  lastPaymentDate   DateTime?
+  lastPaymentAmount Float?
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@map("subscriptions")
+  @@index([userId])
+  @@index([status])
 }

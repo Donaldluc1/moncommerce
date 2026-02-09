@@ -2,6 +2,7 @@
 const { PrismaClient } = require('@prisma/client');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const { createTrialSubscription } = require('../services/subscription.service');
 
 const prisma = new PrismaClient();
 
@@ -56,6 +57,9 @@ const register = async (req, res) => {
         typeActivite: typeActivite || null
       }
     });
+
+    // Créer l'abonnement trial (72h gratuit)
+    await createTrialSubscription(user.id);
 
     // Générer le token JWT
     const token = jwt.sign(
