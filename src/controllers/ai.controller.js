@@ -1,16 +1,22 @@
 // src/controllers/ai.controller.js
 const { PrismaClient } = require('@prisma/client');
-const { analyzeVoiceCommand, validateCommand } = require('../services/ai.service');
+const {
+  analyzeVoiceCommand,
+  validateCommand,
+  listProviders,
+  getDefaultProviderName,
+} = require('../services/ai.service');
 
 const prisma = new PrismaClient();
 
 /**
  * Traiter une commande vocale
  * POST /api/ai/voice-command
+ * Body : { text, provider? } — provider : claude | chatgpt | deepseek
  */
 const processVoiceCommand = async (req, res) => {
   try {
-    const { text } = req.body;
+    const { text, provider } = req.body;
     const userId = req.userId; // Depuis le middleware auth
 
     // Validation
@@ -24,9 +30,14 @@ const processVoiceCommand = async (req, res) => {
     console.log(`\n=== NOUVELLE COMMANDE VOCALE ===`);
     console.log(`User ID: ${userId}`);
     console.log(`Texte: "${text}"`);
+    console.log(`Moteur demandé: ${provider || `(défaut: ${getDefaultProviderName()})`}`);
 
     // ÉTAPE 1 : Analyser avec l'IA
-    const parsed = await analyzeVoiceCommand(text);
+    const parsed = await analyzeVoiceCommand(text, provider);
+
+    // Métadonnées de traçabilité (moteur/modèle réellement utilisés)
+    const aiMeta = parsed._meta || null;
+    delete parsed._meta;
 
     // ÉTAPE 2 : Valider
     const validation = validateCommand(parsed);
@@ -71,6 +82,7 @@ const processVoiceCommand = async (req, res) => {
       message: result.message,
       data: result.data,
       parsedCommand: parsed,
+      aiProvider: aiMeta,
     });
 
   } catch (error) {
@@ -221,19 +233,20 @@ async function handleNouveauClient(parsed, userId) {
 
 /**
  * Tester la connexion IA
- * GET /api/ai/test
+ * GET /api/ai/test?provider=claude|chatgpt|deepseek
  */
 const testAI = async (req, res) => {
   try {
+    const { provider } = req.query;
     const testCommand = 'Enregistre une vente de 5000 francs en espèces';
-    
+
     console.log('[TEST IA] Commande test:', testCommand);
-    const result = await analyzeVoiceCommand(testCommand);
+    const result = await analyzeVoiceCommand(testCommand, provider);
 
     return res.json({
       success: true,
       message: 'Connexion IA fonctionnelle ✅',
-      model: process.env.AI_MODEL,
+      aiProvider: result._meta || null,
       testCommand,
       result,
     });
@@ -246,7 +259,28 @@ const testAI = async (req, res) => {
   }
 };
 
+/**
+ * Lister les moteurs IA disponibles
+ * GET /api/ai/providers
+ */
+const listAIProviders = async (req, res) => {
+  try {
+    return res.json({
+      success: true,
+      default: getDefaultProviderName(),
+      providers: listProviders(),
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      error: 'Erreur lors de la récupération des moteurs IA',
+      details: error.message,
+    });
+  }
+};
+
 module.exports = {
   processVoiceCommand,
   testAI,
+  listAIProviders,
 };

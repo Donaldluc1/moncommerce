@@ -1,10 +1,9 @@
 // src/services/ai.service.js
-const Anthropic = require('@anthropic-ai/sdk');
-
-// Initialiser le client Anthropic
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
+const {
+  resolveProvider,
+  getDefaultProviderName,
+  listProviders,
+} = require('./llm/providers');
 
 // Prompt système pour guider l'IA
 const SYSTEM_PROMPT = `Tu es un assistant IA pour une application de gestion de commerce en Afrique francophone.
@@ -82,9 +81,27 @@ CONSIGNES STRICTES :
 - Si vente crédit sans nom client → type "erreur" avec message explicite`;
 
 /**
- * Analyser une commande vocale avec Claude
+ * Extraire le JSON d'une réponse LLM.
+ * Certains modèles enveloppent le JSON dans des fences markdown malgré les consignes.
  */
-async function analyzeVoiceCommand(textCommand) {
+function extractJson(responseText) {
+  let text = responseText.trim();
+
+  const fenceMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+  if (fenceMatch) {
+    text = fenceMatch[1].trim();
+  }
+
+  return JSON.parse(text);
+}
+
+/**
+ * Analyser une commande vocale avec le moteur IA choisi
+ * @param {string} textCommand - Texte transcrit de la commande vocale
+ * @param {string} [providerName] - Moteur IA (claude | chatgpt | deepseek), sinon AI_PROVIDER
+ */
+async function analyzeVoiceCommand(textCommand, providerName) {
+  let provider;
   try {
     if (!textCommand || textCommand.trim() === '') {
       return {
@@ -93,30 +110,23 @@ async function analyzeVoiceCommand(textCommand) {
       };
     }
 
-    console.log(`[IA] Analyse de: "${textCommand}"`);
+    provider = resolveProvider(providerName);
+    const model = provider.getModel();
 
-    // Appeler Claude API
-    const message = await anthropic.messages.create({
-      model: process.env.AI_MODEL || 'claude-3-5-sonnet-20241022',
-      max_tokens: 1024,
-      temperature: 0.3, // Faible pour des réponses cohérentes
+    console.log(`[IA] Analyse de: "${textCommand}" (moteur: ${provider.name}, modèle: ${model})`);
+
+    const responseText = await provider.complete({
       system: SYSTEM_PROMPT,
-      messages: [
-        {
-          role: 'user',
-          content: textCommand,
-        },
-      ],
+      user: textCommand,
+      model,
     });
 
-    // Extraire la réponse
-    const responseText = message.content[0].text.trim();
     console.log('[IA] Réponse brute:', responseText);
 
     // Parser le JSON
     let parsed;
     try {
-      parsed = JSON.parse(responseText);
+      parsed = extractJson(responseText);
     } catch (parseError) {
       console.error('[IA] Erreur parsing JSON:', parseError);
       return {
@@ -133,24 +143,51 @@ async function analyzeVoiceCommand(textCommand) {
       };
     }
 
+    // Traçabilité : quel moteur a réellement traité la commande
+    parsed._meta = { provider: provider.name, model };
+
     console.log('[IA] Commande analysée:', parsed);
     return parsed;
 
   } catch (error) {
     console.error('[IA] Erreur:', error);
-    
-    // Gérer les erreurs API
+
+    const label = provider ? provider.label : 'IA';
+
+    // Erreurs de configuration (provider inconnu ou clé absente)
+    if (error.code === 'UNKNOWN_PROVIDER' || error.code === 'PROVIDER_NOT_CONFIGURED') {
+      return {
+        type: 'erreur',
+        message: error.message,
+      };
+    }
+
+    // Gérer les erreurs API (les SDK Anthropic et OpenAI exposent tous deux error.status)
     if (error.status === 401) {
       return {
         type: 'erreur',
-        message: 'Clé API invalide. Vérifiez la configuration.',
+        message: `Clé API ${label} invalide. Vérifiez la configuration.`,
+      };
+    }
+
+    if (error.status === 402) {
+      return {
+        type: 'erreur',
+        message: `Solde insuffisant sur le compte ${label}. Rechargez le compte.`,
+      };
+    }
+
+    if (error.status === 404) {
+      return {
+        type: 'erreur',
+        message: `Modèle introuvable chez ${label}. Vérifiez la variable de modèle dans la configuration.`,
       };
     }
 
     if (error.status === 429) {
       return {
         type: 'erreur',
-        message: 'Trop de requêtes. Réessayez dans quelques secondes.',
+        message: `Trop de requêtes vers ${label}. Réessayez dans quelques secondes.`,
       };
     }
 
@@ -232,4 +269,7 @@ function validateCommand(parsedCommand) {
 module.exports = {
   analyzeVoiceCommand,
   validateCommand,
+  extractJson,
+  listProviders,
+  getDefaultProviderName,
 };
