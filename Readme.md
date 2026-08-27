@@ -1,6 +1,8 @@
 # 🚀 Backend API - Gestion Commerce MVP
+google Play Link dowload: https://play.google.com/store/apps/details?id=com.meraky.moncommerce
 
 API REST pour l'application mobile de gestion de commerce.
+Nous avons rajouter une option IA de commande vocale pour etre capable de gerer tous ces elements via des commandes vocale (speech to text)
 
 ## 📋 Technologies
 
