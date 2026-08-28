@@ -1,0 +1,21 @@
+# Backend gestion-commerce — déploiement production
+#
+# Invariants (ne pas modifier sans décision explicite) :
+#   - image  : app_commerce_backend   (nom historique sur le serveur)
+#   - nom du conteneur : app_commerce_backend
+#   - port publié : 3002 (nginx proxy-passe vers localhost:3002)
+#   - aucun volume monté (comme l'existant : le code vit dans l'image)
+#   - la base PostgreSQL n'est PAS gérée ici : c'est le conteneur "postgres_service"
+#     existant (port 5433), joint via DATABASE_URL dans le .env serveur
+services:
+  backend:
+    build: .
+    image: app_commerce_backend
+    container_name: app_commerce_backend
+    ports:
+      - "3002:3002"
+    # Le .env de production est créé une fois sur le serveur dans ce dossier
+    # (jamais commité, jamais copié dans l'image) — voir docs/Deploiement_Backend.md
+    env_file:
+      - .env
+    restart: unless-stopped

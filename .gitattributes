@@ -1,0 +1,2 @@
+# Les scripts shell doivent rester en LF (exécutés sur le serveur Linux via rsync/SSH)
+*.sh text eol=lf

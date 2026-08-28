@@ -1,0 +1,70 @@
+# Déploiement continu du backend sur le serveur de production.
+# Structure : ce repo contient le backend à sa racine.
+#
+# Flux : push sur main → rsync du code vers le serveur
+#        → build de l'image SUR le serveur → recréation du conteneur → healthcheck.
+#
+# Le build se fait sur le serveur (pas de registry) : l'image garde exactement
+# son nom historique "app_commerce_backend", et nginx continue de pointer vers
+# localhost:3002 — l'URL publique ne change jamais.
+#
+# Secrets GitHub requis (Settings → Secrets and variables → Actions) :
+#   SSH_HOST         adresse du serveur
+#   SSH_USER         utilisateur SSH de déploiement
+#   SSH_PRIVATE_KEY  clé privée SSH dédiée au déploiement (jamais réutilisée ailleurs)
+name: Deploy backend
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - '**.md'
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-backend
+  cancel-in-progress: false
+
+env:
+  # Dossier de déploiement sur le serveur ; le .env de production y vit et y reste
+  DEPLOY_PATH: /home/meraky/apps/app_commerce_backend
+
+jobs:
+  deploy:
+    name: Build et déploiement sur le serveur
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Préparer l'accès SSH
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          printf '%s\n' "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "${{ secrets.SSH_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Connectivité SSH (test du port réel, pas de ping)
+        run: |
+          set -euo pipefail
+          nc -zv -w 10 "${{ secrets.SSH_HOST }}" 22
+
+      - name: Synchroniser le code (rsync — le .env serveur est préservé)
+        run: |
+          set -euo pipefail
+          ssh -i ~/.ssh/deploy_key "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
+            "mkdir -p '${DEPLOY_PATH}'"
+          rsync -az --delete --info=stats1 \
+            --exclude '.env' \
+            --exclude 'node_modules/' \
+            --exclude '.git/' \
+            --exclude '.github/' \
+            -e 'ssh -i ~/.ssh/deploy_key' \
+            ./ "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${DEPLOY_PATH}/"
+
+      - name: Build de l'image et redéploiement (noms historiques conservés)
+        run: |
+          set -euo pipefail
+          ssh -i ~/.ssh/deploy_key "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
+            "bash '${DEPLOY_PATH}/deploy/remote-deploy.sh'"
