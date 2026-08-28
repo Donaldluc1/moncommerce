@@ -1,0 +1,20 @@
+# Jamais de secrets dans l'image : le .env de production vit sur le serveur
+# et est injecté via env_file (docker-compose.yml)
+.env
+.env.*
+!.env.example
+
+.git
+.github
+node_modules
+npm-debug.log*
+*.log
+coverage
+tmp
+temp
+.cache
+.vscode
+.idea
+*.md
+test-*.js
+deploy
